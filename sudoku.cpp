@@ -10,6 +10,9 @@ void makeGrid(int (&grid)[9][9], int (&values)[9][9][10]);
 void checkCols(int (&grid)[9][9], int (&values)[9][9][10]);
 void checkRows(int (&grid)[9][9], int (&values)[9][9][10]);
 void checkBoxes(int (&grid)[9][9], int (&values)[9][9][10]);
+void onlyInRow(int (&grid)[9][9], int (&values)[9][9][10]);
+void onlyInCol(int (&grid)[9][9], int (&values)[9][9][10]);
+void onlyInBox(int (&grid)[9][9], int (&values)[9][9][10]);
 void setValues(int (&grid)[9][9], int (&values)[9][9][10]);
 bool checkIfSolved(int (&grid)[9][9]);
 void printGrid(int grid[9][9]);
@@ -31,17 +34,31 @@ int main()
 	bool solved = false;	
 
 	makeGrid(grid, values);
+	printGrid(grid);
 	while(!solved)
 	{
+		//eliminate potential values for blank squares depending on 
+		//already known squares in the same row/column/box.
 		checkRows(grid, values);
 		checkCols(grid, values);
 		checkBoxes(grid, values);
+		
+		//if a blank square is the only square in a row/column/box
+		//that can be a certain value, then it must be that value
+		onlyInRow(grid, values);
+		onlyInCol(grid, values);
+		onlyInBox(grid, values);
+
+		//set values which have only one possibility
 		setValues(grid, values);
-		solved = checkIfSolved(grid);
+
+		//print the grid on each iteration of the loop
 		printGrid(grid);
 		
+		//halt execution if the puzzle is solved
+		solved = checkIfSolved(grid);
 	}
-	//printValues(values);
+	printValues(values);
 	return 0;
 }
 
@@ -51,7 +68,7 @@ void makeGrid(int (&grid)[9][9], int (&values)[9][9][10])
 	//USE FILE FOR TESTING
 	string line;
 	ifstream puzzle;
-	puzzle.open("README.md");
+	puzzle.open("sudoku_22.txt");
 	for(int i = 0; i < 9; i++)
 	{
 		puzzle >> line;
@@ -180,34 +197,20 @@ void printValues(int values[9][9][10])
 
 void checkCols(int (&grid)[9][9], int (&values)[9][9][10])
 {
-	int known_number;
 	for(int col = 0; col < 9; col++)
 	{
 		for(int x = 0; x < 9; x++)
 		{
-			known_number = 0;
 			//this flag means that the value in that position is known
 			if(values[x][col][0])
 			{
-				for(int i = 1; i < 10; i++)
-				{
-					if(values[x][col][i])
-					{
-						known_number = i;
-						break;
-					}
-				}
-			}
-			
-			//if a known value occupies that position
-			if(known_number != 0)
-			{
+				// no other spaces in that column can be the same number
 				for(int a = 0; a < 9; a++)
 				{
-					// no other values in that row can be the same number
+					//ignore the square we found the number in
 					if(a != x)
 					{
-						values[a][col][known_number] = 0;
+						values[a][col][ grid[x][col] ] = 0;
 					}
 				}
 			}
@@ -219,7 +222,6 @@ void checkCols(int (&grid)[9][9], int (&values)[9][9][10])
 
 void checkRows(int (&grid)[9][9], int (&values)[9][9][10])
 {
-	int known_number;
 	for(int row = 0; row < 9; row++)
 	{
 		for(int x = 0; x < 9; x++)
@@ -227,9 +229,10 @@ void checkRows(int (&grid)[9][9], int (&values)[9][9][10])
 			//this flag means that the value in that position is known
 			if(values[row][x][0])
 			{
+				// no other spaces in that row can be the same number
 				for(int a = 0; a < 9; a++)
 				{
-					// no other values in that row can be the same number
+					//ignore the square we found the number in
 					if(a != x)
 					{
 						values[row][a][ grid[row][x] ] = 0;
@@ -256,15 +259,15 @@ void checkBoxes(int (&grid)[9][9], int (&values)[9][9][10])
 			{
 				for(int j = col; j - col < 3; j++)
 				{
-					//if a value is known for certain
+					//this flag means that the value in that position is known
 					if(values[i][j][0])
 					{
-						//no other spaces in that box can be the same value
+						//no other spaces in that box can be the same number
 						for(int a = row; a - row < 3; a++)
 						{
 							for(int b = col; b - col < 3; b++)
 							{
-								//ignore the square we found the values in
+								//ignore the square we found the number in
 								if(!(a == i && b == j))
 								{
 									values[a][b][ grid[i][j] ] = 0;
@@ -302,7 +305,7 @@ void setValues(int (&grid)[9][9], int (&values)[9][9][10])
 				}
 				if(possible_values == 0)
 				{
-					cout << "ERROR: This puzzle is unsolveable, or a msitake was made." << endl;
+					cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
 				}
 				if(possible_values == 1)
 				{
@@ -329,4 +332,166 @@ bool checkIfSolved(int (&grid)[9][9])
 		}
 	}
 	return true;
+}
+
+
+
+void onlyInRow(int (&grid)[9][9], int (&values)[9][9][10])
+{
+	for(int row = 0; row < 9; row++)
+	{
+		int potential_values[10] = {0};
+		
+		//count the number of times within a row a certain value is possible
+		for(int i = 1; i < 10; i++)
+		{
+			for(int x = 0; x < 9; x++)
+			{
+				if(values[row][x][i])
+				{
+					potential_values[i] += 1;
+				}
+			}
+		}
+		//once the list is full, check those counts for each number
+		for(int i = 1; i < 10; i++)
+		{
+			if(potential_values[i] == 0)
+			{
+				cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
+	
+			}
+			//if there is one possibility, then it must be that number
+			if(potential_values[i] == 1)
+			{
+				for(int x = 0; x < 9; x++)
+				{
+					//find the one place where that occurs
+					if(values[row][x][i])
+					{
+						//show that it can only be that value
+						for(int j = 1; j < 10; j++)
+						{
+							if(j != i)
+							{
+								values[row][x][j] = 0;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+
+void onlyInCol(int (&grid)[9][9], int (&values)[9][9][10])
+{
+	for(int col = 0; col < 9; col++)
+	{
+		int potential_values[10] = {0};
+		
+		//count the number of times within a column a certain value is possible
+		for(int i = 1; i < 10; i++)
+		{
+			for(int x = 0; x < 9; x++)
+			{
+				if(values[x][col][i])
+				{
+					potential_values[i] += 1;
+				}
+			}
+		}
+		//once the list is full, check those counts for each number
+		for(int i = 1; i < 10; i++)
+		{
+			if(potential_values[i] == 0)
+			{
+				cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
+	
+			}
+			//if there is one possibility, then it must be that number
+			if(potential_values[i] == 1)
+			{
+				for(int x = 0; x < 9; x++)
+				{
+					//find the one place where that occurs
+					if(values[x][col][i])
+					{
+						//show that it can only be that value
+						for(int j = 1; j < 10; j++)
+						{
+							if(j != i)
+							{
+								values[x][col][j] = 0;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+
+void onlyInBox(int (&grid)[9][9], int (&values)[9][9][10])
+{
+	//row and col iteration find the upper-left corner of each box
+	for(int row = 0; row < 9; row += 3)
+	{
+		for(int col = 0; col < 9; col += 3)
+		{
+			int potential_values[10] = {0};
+			//count the number of times within a box a certain value is possible
+			for(int i = 1; i < 10; i++)
+			{
+				//a and b find the other elements in the box
+				for(int a = row; a - row < 3; a++)
+				{
+					for(int b = col; b - col < 3; b++)
+					{
+						if(values[a][b][i])
+						{
+							potential_values[i] += 1;
+						}
+					}
+				}
+			}
+
+			//once the list is full, check those counts for each number
+			for(int i = 1; i < 10; i++)
+			{
+				if(potential_values[i] == 0)
+				{
+					cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
+		
+				}
+				//if there is one possibility, then it must be that number
+				if(potential_values[i] == 1)
+				{
+					//iterate through the box
+					for(int a = row; a - row < 3; a++)
+					{
+						for(int b = col; b - col < 3; b++)
+						{
+							//find the one place where that occurs
+							if(values[a][b][i])
+							{
+								//show that it can only be that value
+								for(int j = 1; j < 10; j++)
+								{
+									if(j != i)
+									{
+										values[a][b][j] = 0;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
