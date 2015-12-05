@@ -7,12 +7,17 @@ using namespace std;
 
 //FORWARD FUNCTION DECLARATIONS
 void makeGrid(int (&grid)[9][9], int (&values)[9][9][10]);
+void setEqual(int (&grid1)[9][9], int (&grid2)[9][9]);
+bool areEqual(int (&grid1)[9][9], int (&grid2)[9][9]);
 void checkCols(int (&grid)[9][9], int (&values)[9][9][10]);
 void checkRows(int (&grid)[9][9], int (&values)[9][9][10]);
 void checkBoxes(int (&grid)[9][9], int (&values)[9][9][10]);
 void onlyInRow(int (&grid)[9][9], int (&values)[9][9][10]);
 void onlyInCol(int (&grid)[9][9], int (&values)[9][9][10]);
 void onlyInBox(int (&grid)[9][9], int (&values)[9][9][10]);
+void groupInRow(int (&grid)[9][9], int (&values)[9][9][10]);
+void groupInCol(int (&grid)[9][9], int (&values)[9][9][10]);
+//void groupInBox(int (&grid)[9][9], int (&values)[9][9][10]);
 void setValues(int (&grid)[9][9], int (&values)[9][9][10]);
 bool checkIfSolved(int (&grid)[9][9]);
 void printGrid(int grid[9][9]);
@@ -31,12 +36,21 @@ int main()
 		{0, 0, 0, 0, 0, 0, 0, 0, 0},  
 		{0, 0, 0, 0, 0, 0, 0, 0, 0}};
 	int values[9][9][10] = {0};
+	int earlier_grid[9][9];
 	bool solved = false;	
+	int iteration = 0;
+	bool grid_unchanging = false;
 
 	makeGrid(grid, values);
 	printGrid(grid);
-	while(!solved)
+	while(!solved && !grid_unchanging)
 	{
+		//create initial grid to see if we are making progress
+		if(iteration % 5 == 0)
+		{
+			setEqual(earlier_grid, grid);
+		}
+
 		//eliminate potential values for blank squares depending on 
 		//already known squares in the same row/column/box.
 		checkRows(grid, values);
@@ -49,6 +63,13 @@ int main()
 		onlyInCol(grid, values);
 		onlyInBox(grid, values);
 
+		//when only 2-3 squares in a row/column/box can be a certain value
+		//and all elements in the group are in the same box/box/row&column
+		//other squares in that box/box/row&column cannot be that value
+		groupInRow(grid, values);
+		groupInCol(grid, values);
+		//groupInBox(grid, values);
+		
 		//set values which have only one possibility
 		setValues(grid, values);
 
@@ -57,7 +78,16 @@ int main()
 		
 		//halt execution if the puzzle is solved
 		solved = checkIfSolved(grid);
+
+		//halt execution if the program cannot make any more progress
+		iteration++;
+		if(iteration % 5 == 0)
+		{
+			grid_unchanging = areEqual(earlier_grid, grid);
+		}
 	}
+
+	//either we have solved the puzzle or can't make progress. print the results
 	printValues(values);
 	return 0;
 }
@@ -68,7 +98,7 @@ void makeGrid(int (&grid)[9][9], int (&values)[9][9][10])
 	//USE FILE FOR TESTING
 	string line;
 	ifstream puzzle;
-	puzzle.open("sudoku_22.txt");
+	puzzle.open("sudoku_30.txt");
 	for(int i = 0; i < 9; i++)
 	{
 		puzzle >> line;
@@ -487,6 +517,176 @@ void onlyInBox(int (&grid)[9][9], int (&values)[9][9][10])
 										values[a][b][j] = 0;
 									}
 								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+
+void setEqual(int (&grid1)[9][9], int (&grid2)[9][9])
+{
+	for(int i = 0; i < 9; i++)
+	{
+		for(int j = 0; j < 9; j++)
+		{
+			grid1[i][j] = grid2[i][j];
+		}
+	}
+}
+
+
+
+bool areEqual(int (&grid1)[9][9], int (&grid2)[9][9])
+{
+	for(int i = 0; i < 9; i++)
+	{
+		for(int j = 0; j < 9; j++)
+		{
+			if(grid1[i][j] != grid2[i][j])
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+
+
+void groupInRow(int (&grid)[9][9], int (&values)[9][9][10])
+{
+	for(int row = 0; row < 9; row++)
+	{
+		int potential_values[10] = {0};
+		int group_member_at[9] = {0};
+		bool in_same_box = true;
+		int start_col = 0;
+		int start_row = row - (row % 3);
+
+		//for each of the nine possible numbers
+		for(int i = 1; i < 10; i++)
+		{
+			//assume this technique is applicable
+			in_same_box = true;
+			//reset the array determining where our 2-3 values are
+			for(int a = 0; a < 9; a++)
+			{
+				group_member_at[a] = 0;
+			}
+			//write down how many and where the 2-3 values are
+			for(int x = 0; x < 9; x++)
+			{
+				if(values[row][x][i])
+				{
+					group_member_at[x] = 1;
+					potential_values[i] += 1;
+				}
+			}
+
+			if(potential_values[i] == 0)
+			{
+				cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
+	
+			}
+			//only proceed if the technique is applicable to our situation
+			if(potential_values[i] == 3 || potential_values[i] == 2)
+			{
+				if((group_member_at[0] && group_member_at[3]) || (group_member_at[0] && group_member_at[4]) || (group_member_at[0] && group_member_at[5]) || (group_member_at[0] && group_member_at[6]) || (group_member_at[0] && group_member_at[7]) || (group_member_at[0] && group_member_at[8]) || (group_member_at[1] && group_member_at[3]) || (group_member_at[1] && group_member_at[4]) || (group_member_at[1] && group_member_at[5]) || (group_member_at[1] && group_member_at[6]) || (group_member_at[1] && group_member_at[7]) || (group_member_at[1] && group_member_at[8]) || (group_member_at[2] && group_member_at[3]) || (group_member_at[2] && group_member_at[4]) || (group_member_at[2] && group_member_at[5]) || (group_member_at[2] && group_member_at[6]) || (group_member_at[2] && group_member_at[7]) || (group_member_at[2] && group_member_at[8]) || (group_member_at[3] && group_member_at[6]) || (group_member_at[3] && group_member_at[7]) || (group_member_at[3] && group_member_at[8]) || (group_member_at[4] && group_member_at[6]) || (group_member_at[4] && group_member_at[7]) || (group_member_at[4] && group_member_at[8]) ||(group_member_at[5] && group_member_at[6]) || (group_member_at[5] && group_member_at[7]) || (group_member_at[5] && group_member_at[8]))
+				{
+					in_same_box = false;
+				}
+				if(in_same_box)
+				{
+					for(int x = 0; x < 9; x++)
+					{
+						if(group_member_at[x])
+						{
+							start_col = x - (x % 3);
+							break;
+						}
+					}
+					for(int a = start_row; a < start_row + 3; a++)
+					{
+						for(int b = start_col; b < start_col + 3; b++)
+						{
+							if(a != row)
+							{
+								values[a][b][i] = 0;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+
+void groupInCol(int (&grid)[9][9], int (&values)[9][9][10])
+{
+	for(int col = 0; col < 9; col++)
+	{
+		int potential_values[10] = {0};
+		int group_member_at[9] = {0};
+		bool in_same_box = true;
+		int start_col = col - (col % 3);
+		int start_row = 0;
+
+		//for each of the nine possible numbers
+		for(int i = 1; i < 10; i++)
+		{
+			//assume this technique is applicable
+			in_same_box = true;
+			//reset the array determining where our 2-3 values are
+			for(int a = 0; a < 9; a++)
+			{
+				group_member_at[a] = 0;
+			}
+			//write down how many and where the 2-3 values are
+			for(int x = 0; x < 9; x++)
+			{
+				if(values[x][col][i])
+				{
+					group_member_at[x] = 1;
+					potential_values[i] += 1;
+				}
+			}
+
+			if(potential_values[i] == 0)
+			{
+				cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
+	
+			}
+			//only proceed if the technique is applicable to our situation
+			if(potential_values[i] == 3 || potential_values[i] == 2)
+			{
+				if((group_member_at[0] && group_member_at[3]) || (group_member_at[0] && group_member_at[4]) || (group_member_at[0] && group_member_at[5]) || (group_member_at[0] && group_member_at[6]) || (group_member_at[0] && group_member_at[7]) || (group_member_at[0] && group_member_at[8]) || (group_member_at[1] && group_member_at[3]) || (group_member_at[1] && group_member_at[4]) || (group_member_at[1] && group_member_at[5]) || (group_member_at[1] && group_member_at[6]) || (group_member_at[1] && group_member_at[7]) || (group_member_at[1] && group_member_at[8]) || (group_member_at[2] && group_member_at[3]) || (group_member_at[2] && group_member_at[4]) || (group_member_at[2] && group_member_at[5]) || (group_member_at[2] && group_member_at[6]) || (group_member_at[2] && group_member_at[7]) || (group_member_at[2] && group_member_at[8]) || (group_member_at[3] && group_member_at[6]) || (group_member_at[3] && group_member_at[7]) || (group_member_at[3] && group_member_at[8]) || (group_member_at[4] && group_member_at[6]) || (group_member_at[4] && group_member_at[7]) || (group_member_at[4] && group_member_at[8]) ||(group_member_at[5] && group_member_at[6]) || (group_member_at[5] && group_member_at[7]) || (group_member_at[5] && group_member_at[8]))
+				{
+					in_same_box = false;
+				}
+				if(in_same_box)
+				{
+					for(int x = 0; x < 9; x++)
+					{
+						if(group_member_at[x])
+						{
+							start_row = x - (x % 3);
+							break;
+						}
+					}
+					for(int a = start_row; a < start_row + 3; a++)
+					{
+						for(int b = start_col; b < start_col + 3; b++)
+						{
+							if(b != col)
+							{
+								values[a][b][i] = 0;
 							}
 						}
 					}
