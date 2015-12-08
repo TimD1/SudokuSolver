@@ -6,6 +6,7 @@ using namespace std;
 
 
 //FORWARD FUNCTION DECLARATIONS
+bool fileExists(string file_name);
 void makeGrid(int (&grid)[9][9], int (&values)[9][9][10]);
 void setEqual(int (&grid1)[9][9], int (&grid2)[9][9]);
 bool areEqual(int (&grid1)[9][9], int (&grid2)[9][9]);
@@ -18,6 +19,9 @@ void onlyInBox(int (&grid)[9][9], int (&values)[9][9][10]);
 void groupInRow(int (&grid)[9][9], int (&values)[9][9][10]);
 void groupInCol(int (&grid)[9][9], int (&values)[9][9][10]);
 void groupInBox(int (&grid)[9][9], int (&values)[9][9][10]);
+void nakedPairsRow(int (&grid)[9][9], int (&values)[9][9][10]);
+void nakedPairsCol(int (&grid)[9][9], int (&values)[9][9][10]);
+void nakedPairsBox(int (&grid)[9][9], int (&values)[9][9][10]);
 void setValues(int (&grid)[9][9], int (&values)[9][9][10]);
 bool checkIfSolved(int (&grid)[9][9]);
 void printGrid(int grid[9][9]);
@@ -70,11 +74,19 @@ int main()
 		groupInCol(grid, values);
 		groupInBox(grid, values);
 		
+		//when it can be determined that these n values must go in these
+		//n positions, but it's impossible to determine which go where
+		//example: square A must be 4 or 9 and square B must be 4 or 9
+		nakedPairsRow(grid, values);
+		nakedPairsCol(grid, values);
+		nakedPairsBox(grid, values);
+		
+
 		//set values which have only one possibility
 		setValues(grid, values);
 
 		//print the grid on each iteration of the loop
-		printGrid(grid);
+		//printGrid(grid);
 		
 		//halt execution if the puzzle is solved
 		solved = checkIfSolved(grid);
@@ -88,24 +100,47 @@ int main()
 	}
 
 	//either we have solved the puzzle or can't make progress. print the results
-	printValues(values);
+	printGrid(grid);
+	//printValues(values);
 	return 0;
 }
+
+
+
+
+//https://stackoverflow.com/questions/12774207/fastest-way-to-check-if-a-file-exist-usin     g-standard-c-c11-c
+bool fileExists(string file_name)
+{
+	ifstream the_file(file_name.c_str());
+    return the_file.good();
+}
+
+
 
 
 void makeGrid(int (&grid)[9][9], int (&values)[9][9][10])
 {
 	//USE FILE FOR TESTING
-	string line;
-	ifstream puzzle;
-	puzzle.open("sudokutest.txt");
-	for(int i = 0; i < 9; i++)
+	string filename = "example_puzzle.txt";
+	cout << "Please enter the filename of your sudoku puzzle: ";
+	cin >> filename;
+	if(fileExists(filename))
 	{
-		puzzle >> line;
-		for(int j = 0; j < line.length(); j++)
+		string line;
+		ifstream puzzle(filename.c_str());
+		for(int i = 0; i < 9; i++)
 		{
-			grid[i][j] = line[j] - '0';
+			puzzle >> line;
+			for(int j = 0; j < line.length(); j++)
+			{
+				grid[i][j] = line[j] - '0';
+			}
 		}
+	}
+	else
+	{
+		cout << "The requested file does not exist in your current directory." << endl;
+		return;
 	}
 
 	//USE USER INPUT FOR FINAL VERSION
@@ -799,3 +834,260 @@ void groupInBox(int (&grid)[9][9], int (&values)[9][9][10])
 		}
 	}
 }
+
+
+
+
+void nakedPairsBox(int (&grid)[9][9], int (&values)[9][9][10])
+{
+	/*
+	  This is a more advanced technique. In its simplest form, there are two boxes of interest and it can be determined 
+	  which two numbers are placed there, but the order of the two numbers which go there is unknown. Since the program 
+	  at this point does not narrow options unless a concrete guess is established, this function is necessary to reduce
+	  the possible values of the squares in the box to reflect that these two numbers MUST go in that specific location.
+	*/
+
+	//for every number 1-9
+	for(int x = 1; x < 10; x++)
+	{
+		//for each box in the grid
+		for(int box_row = 0; box_row < 9; box_row += 3)
+		{
+			for(int box_col = 0; box_col < 9; box_col += 3)
+			{
+				int numbers_in_group[10] = {0};
+				numbers_in_group[x] = 1;
+
+				int poss_positions = 0;
+				//find the number of places within the box a value can appear
+				for(int row = box_row; row < box_row+3; row++)
+				{
+					for(int col = box_col; col < box_col+3; col++)
+					{
+						if(values[row][col][x])
+						{
+							poss_positions += 1;
+						}
+					}
+				}
+				
+				//see if there are any other numbers with the exact same restrictions
+				int group_size = 1;
+				for(int y = x+1; y < 10; y++)
+				{
+					bool same = true;
+					for(int row = box_row; row < box_row+3; row++)
+					{
+						for(int col = box_col; col < box_col+3; col++)
+						{
+							//check if all potential values are in the same boxes
+							if(values[row][col][x] != values[row][col][y])
+							{
+								same = false;
+							}
+						}
+					}
+					if(same)
+					{
+						numbers_in_group[y] = 1;
+						group_size += 1;
+					}
+				}
+				if(group_size == poss_positions)
+				{
+					//we found a place to use this technique! now implement it
+					
+					//for each number in the group
+					for(int i = 1; i < 10; i++)
+					{
+						if(numbers_in_group[i])
+						{
+							//for each square in the box
+							for(int row = box_row; row < box_row+3; row++)
+							{
+								for(int col = box_col; col < box_col+3; col++)
+								{
+									//if it belongs to the group must be one of the numbers in the group
+									if(values[row][col][i])
+									{
+										//set the values matrix to reflect this
+										for(int j = 1; j < 10; j++)
+										{
+											if(!numbers_in_group[j])
+											{
+												values[row][col][j] = 0;
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+
+
+void nakedPairsRow(int (&grid)[9][9], int (&values)[9][9][10])
+{
+	/*
+	  This is a more advanced technique. In its simplest form, there are two squares of interest and it can be determined 
+	  which two numbers are placed there, but the order of the two numbers which go there is unknown. Since the program 
+	  at this point does not narrow options unless a concrete guess is established, this function is necessary to reduce
+	  the possible values of the squares in the row to reflect that these two numbers MUST go in that specific location.
+	*/
+
+	//for every number 1-9
+	for(int x = 1; x < 10; x++)
+	{
+		//for each box in the grid
+		for(int row = 0; row < 9; row++)
+		{
+			int numbers_in_group[10] = {0};
+			numbers_in_group[x] = 1;
+
+			int poss_positions = 0;
+			//find the number of places within the box a value can appear
+			for(int col = 0; col < 9; col++)
+			{
+				if(values[row][col][x])
+				{
+					poss_positions += 1;
+				}
+			}
+			
+			//see if there are any other numbers with the exact same restrictions
+			int group_size = 1;
+			for(int y = x+1; y < 10; y++)
+			{
+				bool same = true;
+				for(int col = 0; col < 9; col++)
+				{
+					//check if all potential values are in the same boxes
+					if(values[row][col][x] != values[row][col][y])
+					{
+						same = false;
+					}
+				}
+				if(same)
+				{
+					numbers_in_group[y] = 1;
+					group_size += 1;
+				}
+			}
+			if(group_size == poss_positions)
+			{
+				//we found a place to use this technique! now implement it
+				
+				//for each number in the group
+				for(int i = 1; i < 10; i++)
+				{
+					if(numbers_in_group[i])
+					{
+						for(int col = 0; col < 9; col++)
+						{
+							//if it belongs to the group must be one of the numbers in the group
+							if(values[row][col][i])
+							{
+								//set the values matrix to reflect this
+								for(int j = 1; j < 10; j++)
+								{
+									if(!numbers_in_group[j])
+									{
+										values[row][col][j] = 0;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+
+
+void nakedPairsCol(int (&grid)[9][9], int (&values)[9][9][10])
+{
+	/*
+	  This is a more advanced technique. In its simplest form, there are two squares of interest and it can be determined 
+	  which two numbers are placed there, but the order of the two numbers which go there is unknown. Since the program 
+	  at this point does not narrow options unless a concrete guess is established, this function is necessary to reduce
+	  the possible values of the squares in the column to reflect that these two numbers MUST go in that specific location.
+	*/
+
+	//for every number 1-9
+	for(int x = 1; x < 10; x++)
+	{
+		//for each box in the grid
+		for(int col = 0; col < 9; col++)
+		{
+			int numbers_in_group[10] = {0};
+			numbers_in_group[x] = 1;
+
+			int poss_positions = 0;
+			//find the number of places within the box a value can appear
+			for(int row = 0; row < 9; row++)
+			{
+				if(values[row][col][x])
+				{
+					poss_positions += 1;
+				}
+			}
+			
+			//see if there are any other numbers with the exact same restrictions
+			int group_size = 1;
+			for(int y = x+1; y < 10; y++)
+			{
+				bool same = true;
+				for(int row = 0; row < 9; row++)
+				{
+					//check if all potential values are in the same boxes
+					if(values[row][col][x] != values[row][col][y])
+					{
+						same = false;
+					}
+				}
+				if(same)
+				{
+					numbers_in_group[y] = 1;
+					group_size += 1;
+				}
+			}
+			if(group_size == poss_positions)
+			{
+				//we found a place to use this technique! now implement it
+				
+				//for each number in the group
+				for(int i = 1; i < 10; i++)
+				{
+					if(numbers_in_group[i])
+					{
+						for(int row = 0; row < 9; row++)
+						{
+							//if it belongs to the group must be one of the numbers in the group
+							if(values[row][col][i])
+							{
+								//set the values matrix to reflect this
+								for(int j = 1; j < 10; j++)
+								{
+									if(!numbers_in_group[j])
+									{
+										values[row][col][j] = 0;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
