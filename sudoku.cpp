@@ -1,13 +1,14 @@
-#include <iostream>
-#include <string>
-#include <fstream>
+#include <iostream>		//because who doesn't use that?
+#include <string>		//for file names and usage
+#include <fstream>		//for file input/output
+#include <stack>		//to store guessed values and the corresponding arrays
 
 using namespace std;
 
 
 //FORWARD FUNCTION DECLARATIONS
 bool fileExists(string file_name);
-void makeGrid(int (&grid)[9][9], int (&values)[9][9][10]);
+int makeGrid(int (&grid)[9][9], int (&values)[9][9][10]);
 void setEqual(int (&grid1)[9][9], int (&grid2)[9][9]);
 bool areEqual(int (&grid1)[9][9], int (&grid2)[9][9]);
 void checkCols(int (&grid)[9][9], int (&values)[9][9][10]);
@@ -22,7 +23,11 @@ void groupInBox(int (&grid)[9][9], int (&values)[9][9][10]);
 void nakedPairsRow(int (&grid)[9][9], int (&values)[9][9][10]);
 void nakedPairsCol(int (&grid)[9][9], int (&values)[9][9][10]);
 void nakedPairsBox(int (&grid)[9][9], int (&values)[9][9][10]);
-void setValues(int (&grid)[9][9], int (&values)[9][9][10]);
+string makeGuess(const int (&values)[9][9][10]);
+void useGuess(string guess, int (&values)[9][9][10], stack<string>& values_stack, stack<string>& guess_stack);
+void fixWrongGuess(int& errors, int (&grid)[9][9], int (&values)[9][9][10], stack<string>& values_stack, stack<string>& guess_stack);
+int setValues(int (&grid)[9][9], int (&values)[9][9][10]);
+int checkValidity(int (&grid)[9][9]);
 bool checkIfSolved(int (&grid)[9][9]);
 void printGrid(int grid[9][9]);
 void printValues(int values[9][9][10]);
@@ -42,12 +47,21 @@ int main()
 	int values[9][9][10] = {0};
 	int earlier_grid[9][9];
 	bool solved = false;	
-	int iteration = 0;
+	int iteration = 1;
+	int errors = 0;
 	bool grid_unchanging = false;
+	int quit = 0;
+	stack<string> values_stack;
+	stack<string> guess_stack;
 
-	makeGrid(grid, values);
+	quit = makeGrid(grid, values);
+	if(quit)
+	{
+		return 0;
+	}
+	cout << endl << endl << "Initial Board: ";
 	printGrid(grid);
-	while(!solved && !grid_unchanging)
+	while(!solved)
 	{
 		//create initial grid to see if we are making progress
 		if(iteration % 5 == 0)
@@ -83,25 +97,39 @@ int main()
 		
 
 		//set values which have only one possibility
-		setValues(grid, values);
+		errors += setValues(grid, values);
+		errors += checkValidity(grid);
+
 
 		//print the grid on each iteration of the loop
 		//printGrid(grid);
+		//printValues(values);
 		
 		//halt execution if the puzzle is solved
 		solved = checkIfSolved(grid);
 
-		//halt execution if the program cannot make any more progress
+		//check if the program cannot make any more progress
 		iteration++;
 		if(iteration % 5 == 0)
 		{
 			grid_unchanging = areEqual(earlier_grid, grid);
 		}
+		//if so, start making some guesses!
+		if(grid_unchanging)
+		{
+			string guess = makeGuess(values);
+			useGuess(guess, values, values_stack, guess_stack);
+			setValues(grid, values);
+			grid_unchanging = false;
+		}
+		//statistically, most of our guesses will be wrong
+		fixWrongGuess(errors, grid, values, values_stack, guess_stack);
+		errors = 0;
 	}
 
 	//either we have solved the puzzle or can't make progress. print the results
+	cout << "Final Board: ";
 	printGrid(grid);
-	//printValues(values);
 	return 0;
 }
 
@@ -118,7 +146,7 @@ bool fileExists(string file_name)
 
 
 
-void makeGrid(int (&grid)[9][9], int (&values)[9][9][10])
+int makeGrid(int (&grid)[9][9], int (&values)[9][9][10])
 {
 	//USE FILE FOR TESTING
 	string filename = "example_puzzle.txt";
@@ -140,45 +168,8 @@ void makeGrid(int (&grid)[9][9], int (&values)[9][9][10])
 	else
 	{
 		cout << "The requested file does not exist in your current directory." << endl;
-		return;
+		return 1;
 	}
-
-	//USE USER INPUT FOR FINAL VERSION
-	/*bool correct_input = false;
-	string line;
-	while(!correct_input)
-	{
-		start:
-		cout << "Please enter the sudoku board, with nine numbers per line and zeros representing blank spaces." << endl;
-		
-		for(int lines = 0; lines < 9; lines++)
-		{
-			cin >> line;
-			//check all lines are nine digits long
-			if(line.length() != 9)
-			{
-				cout << "You must enter nine numbers on each line." << endl << endl;
-				goto start;
-			}
-			//check all values given are digits 0-9
-			for(int i = 0; i < 9; i++)
-			{
-				if(line[i] - '0' < 0 || line[i] - '0' > 9)
-				{
-					cout << "You must enter only digits 0-9." << endl << endl;
-					goto start;
-				}
-			}
-			//the use input has passed both tests, so fill in the grid now
-			correct_input = true;
-			for(int i = 0; i < 9; i++)
-			{
-				grid[lines][i] = line[i] - '0';
-			}
-		}
-	}
-	*/
-
 
 	int value;
 	//for each square on the grid
@@ -202,6 +193,7 @@ void makeGrid(int (&grid)[9][9], int (&values)[9][9][10])
 			}
 		}
 	}
+	return 0;
 }
 
 
@@ -348,8 +340,15 @@ void checkBoxes(int (&grid)[9][9], int (&values)[9][9][10])
 
 
 
-void setValues(int (&grid)[9][9], int (&values)[9][9][10])
+int setValues(int (&grid)[9][9], int (&values)[9][9][10])
 {
+	/*
+	   This function sets the values of any square in the grid which only has one potential number. 
+	   It may be important to know that the value in values[x][y][0] is set to 1 if the value has been
+	   determined, and remains a 0 otherwise. This way, other functions only need to check one value
+	   to determine whether or not a value is already known.
+	*/
+
 	int possible_values;
 	int value;
 	for(int i = 0; i < 9; i++)
@@ -368,10 +367,13 @@ void setValues(int (&grid)[9][9], int (&values)[9][9][10])
 						value = k;
 					}
 				}
+				//there should always be at least one potential value for every square
 				if(possible_values == 0)
 				{
-					cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
+					//cout << "Error at: " << i << " " << j << endl;
+					return 1;
 				}
+				//set the value, and show that it has been set
 				if(possible_values == 1)
 				{
 					grid[i][j] = value;
@@ -380,6 +382,7 @@ void setValues(int (&grid)[9][9], int (&values)[9][9][10])
 			}
 		}
 	}
+	return 0;
 }
 
 
@@ -421,11 +424,6 @@ void onlyInRow(int (&grid)[9][9], int (&values)[9][9][10])
 		//once the list is full, check those counts for each number
 		for(int i = 1; i < 10; i++)
 		{
-			if(potential_values[i] == 0)
-			{
-				cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
-	
-			}
 			//if there is one possibility, then it must be that number
 			if(potential_values[i] == 1)
 			{
@@ -471,11 +469,6 @@ void onlyInCol(int (&grid)[9][9], int (&values)[9][9][10])
 		//once the list is full, check those counts for each number
 		for(int i = 1; i < 10; i++)
 		{
-			if(potential_values[i] == 0)
-			{
-				cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
-	
-			}
 			//if there is one possibility, then it must be that number
 			if(potential_values[i] == 1)
 			{
@@ -528,11 +521,6 @@ void onlyInBox(int (&grid)[9][9], int (&values)[9][9][10])
 			//once the list is full, check those counts for each number
 			for(int i = 1; i < 10; i++)
 			{
-				if(potential_values[i] == 0)
-				{
-					cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
-		
-				}
 				//if there is one possibility, then it must be that number
 				if(potential_values[i] == 1)
 				{
@@ -622,12 +610,6 @@ void groupInRow(int (&grid)[9][9], int (&values)[9][9][10])
 					potential_values[i] += 1;
 				}
 			}
-
-			if(potential_values[i] == 0)
-			{
-				cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
-	
-			}
 			//only proceed if the technique is applicable to our situation
 			if(potential_values[i] == 3 || potential_values[i] == 2)
 			{
@@ -693,11 +675,6 @@ void groupInCol(int (&grid)[9][9], int (&values)[9][9][10])
 				}
 			}
 
-			if(potential_values[i] == 0)
-			{
-				cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
-	
-			}
 			//only proceed if the technique is applicable to our situation
 			if(potential_values[i] == 3 || potential_values[i] == 2)
 			{
@@ -772,12 +749,6 @@ void groupInBox(int (&grid)[9][9], int (&values)[9][9][10])
 							potential_values[i] += 1;
 						}
 					}
-				}
-
-				if(potential_values[i] == 0)
-				{
-					cout << "ERROR: This puzzle is unsolveable, or a mistake was made." << endl;
-		
 				}
 
 				//only proceed if the technique is applicable to our situation
@@ -1091,3 +1062,249 @@ void nakedPairsCol(int (&grid)[9][9], int (&values)[9][9][10])
 	}
 }
 
+
+
+
+int checkValidity(int (&grid)[9][9])
+{
+	/*
+	   After allowing the program to make guesses, it is possible that we ended up with a "solved" grid that actually
+	   violates some of the key rules of sudoku. To make sure that our solution is valid, we use this simple test.
+	*/
+
+	int used_values[10] = {0};
+
+	//ROWS
+	for(int row = 0; row < 9; row++)
+	{
+		for(int i = 0; i < 10; i++)
+		{
+			used_values[i] = 0;
+		}
+		for(int col = 0; col < 9; col++)
+		{
+			if(grid[row][col] != 0)
+			{
+				if(used_values[ grid[row][col] ])
+				{
+					return 1;
+				}
+				else
+				{
+					used_values[ grid[row][col] ] = 1;
+				}
+			}
+		}
+	}
+	//now we know all rows are valid
+
+	//COLUMNS
+	for(int col = 0; col < 9; col++)
+	{
+		for(int i = 0; i < 10; i++)
+		{
+			used_values[i] = 0;
+		}
+		for(int row = 0; row < 9; row++)
+		{
+			if(grid[row][col] != 0)
+			{
+				if(used_values[ grid[row][col] ])
+				{
+					return 1;
+				}
+				else
+				{
+					used_values[ grid[row][col] ] = 1;
+				}
+			}
+		}
+	}
+	//now we know all rows and columns are valid
+
+	//BOXES
+	for(int box_row = 0; box_row < 9; box_row += 3)
+	{
+		for(int box_col = 0; box_col < 9; box_col += 3)
+		{
+			for(int i = 0; i < 10; i++)
+			{
+				used_values[i] = 0;
+			}
+			for(int row = box_row; row < box_row+3; row++)
+			{
+				for(int col = box_col; col < box_col+3; col++)
+				{
+					if(grid[row][col] != 0)
+					{
+						if(used_values[ grid[row][col] ])
+						{
+							return 1;
+						}
+						else
+						{
+							used_values[ grid[row][col] ] = 1;
+						}
+					}
+				}
+			}
+		}
+	}
+	//now we know that our entire solution is valid!
+	return 0;
+}
+
+
+
+
+string makeGuess(const int (&values)[9][9][10])
+{
+	/* In order to improve the efficiency of the program, it is a good idea to have the program make a guess
+	   in one of the squares in which the fewest options remain. This program will return the first square it sees
+	   with only two options or whichever square has the fewest options remaining. This information is packed into 
+	   a string, where the first digit is the row of the guess, the second digit is the column of the guess, and the
+	   third digit is the actual number that was guessed.
+	*/
+	int min_options = 9;
+	string guess = "000";
+	for(int row = 0; row < 9; row++)
+	{
+		for(int col = 0; col < 9; col++)
+		{
+			if(!values[row][col][0])
+			{
+				int options_here = 0;
+				int an_option = 0;
+				for(int x = 1; x < 10; x++)
+				{
+					if(values[row][col][x])
+					{
+						options_here++;
+						an_option = x;
+					}
+				}
+				if(options_here < min_options)
+				{
+					min_options = options_here;
+					guess[0] = char('0' + row);
+					guess[1] = char('0' + col);
+					guess[2] = char('0' + an_option);
+				}
+				if(min_options == 2)
+				{
+					return guess;
+				}
+			}
+		}
+	}
+	return guess;
+}
+
+
+
+
+void useGuess(string guess, int (&values)[9][9][10], stack<string>& values_stack, stack<string>& guess_stack)
+{
+	//convert current grid to string because I can't figure out how the save a multidimensional array returned from stack.top()
+	string values_string = "";
+	for(int row = 0; row < 9; row++)
+	{
+		for(int col = 0; col < 9; col++)
+		{
+			for(int num = 0; num < 10; num++)
+			{
+				values_string = values_string + char('0' + values[row][col][num]);
+			}
+		}
+	}
+
+	//save a copy of the known correct value grid before making a (possibly incorrect) guess
+	guess_stack.push(guess);
+	values_stack.push(values_string);
+
+	//implement the guess
+	int row = char(guess[0] - '0');
+	int col = char(guess[1] - '0');
+	int num = char(guess[2] - '0');
+	
+	//set all possible values to zero
+	for(int i = 1; i < 10; i++)
+	{
+		values[row][col][i] = 0;
+	}
+	//except our guess
+	values[row][col][num] = 1;
+}
+
+
+
+
+
+void fixWrongGuess(int& errors, int (&grid)[9][9], int (&values)[9][9][10], stack<string>& values_stack, stack<string>& guess_stack)
+{
+	if(errors == 0)
+	{
+		return;
+	}
+
+	//if there is an error, reset the values grid to where we last made a guess
+	string values_string = values_stack.top();
+	values_stack.pop();
+
+	//convert string to 3D matrix
+	int row = 0;
+	int col = 0;
+	int num = 0;
+	for(int i = 0; i < values_string.length(); i++)
+	{
+		row = i / 90;
+		col = (i % 90) / 10;
+		num = i % 10;
+		values[row][col][num] = values_string[i] - '0';
+	}
+
+	int poss_values = 0;
+	//update the grid we show the user to reflect these changes
+	for(int row = 0; row < 9; row++)
+	{
+		for(int col = 0; col < 9; col++)
+		{
+			poss_values = 0;
+			//if a values is known (there should be one option)
+			if(values[row][col][0])
+			{
+				for(int i = 1; i < 10; i++)
+				{
+					if(values[row][col][i])
+					{
+						grid[row][col] = i;
+						poss_values += 1;
+					}
+				}
+			}
+			else
+			{
+				grid[row][col] = 0;
+			}
+			if(poss_values > 1)
+			{
+				cout << "Something is definitely wrong." << endl;
+			}
+		}
+	}
+	
+	string last_guess = guess_stack.top();
+	guess_stack.pop();
+
+	//unpack the data in the guess string
+	row = char(last_guess[0] - '0');
+	col = char(last_guess[1] - '0');
+	num = char(last_guess[2] - '0');
+
+	//we have learned that our guess was wrong
+	values[row][col][num] = 0;
+
+	//hopefully this fixed the error
+	errors = 0;
+	setValues(grid, values);
+}
