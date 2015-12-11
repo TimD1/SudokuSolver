@@ -4,53 +4,53 @@ Sudoku Solver
 This automated sudoku puzzle solver will begin by asking the user to input the name of the file containing a sudoku grid to be solved. This file, such as **"example\_puzzle.txt"** should contain nothing but a sudoku board in the following format:
 
 ```
-200804006
-006000500
-074000920
-300040007
-000305000
-400060009
-019000740
-008000200
-500608001
+000801000
+000000430
+500000000
+000070800
+000000100
+020030000
+600000075
+003400000
+000200600
+				  
 ```
 
-The program **"sudoku.cpp"** will attempt to solve the given sudoku puzzle, using various techniques. Although the program cannot yet solve every possible sudoku puzzle, that is my ultimate goal. Currently, however, it has solved all tested puzzles beginning with more than 22 hints, and has solved several puzzles with fewer.
+The program **"sudoku.cpp"** will solve the given sudoku puzzle, using various techniques. The minimum number of hints that a solveable sudoku board may begin with is 17, and this program has no trouble solving those boards in significantly under a second.
 
-Once the program can either make no more progress or is finished, it will report both the initial board and the final board as follows:
+Once the program has determined the solution, it will report both the initial board and the final board as follows:
 
 ```
 Initial Board: 
 
 +-------+-------+-------+
-| 2 0 0 | 8 0 4 | 0 0 6 | 
-| 0 0 6 | 0 0 0 | 5 0 0 | 
-| 0 7 4 | 0 0 0 | 9 2 0 | 
+| 0 0 0 | 8 0 1 | 0 0 0 | 
+| 0 0 0 | 0 0 0 | 4 3 0 | 
+| 5 0 0 | 0 0 0 | 0 0 0 | 
 +-------+-------+-------+
-| 3 0 0 | 0 4 0 | 0 0 7 | 
-| 0 0 0 | 3 0 5 | 0 0 0 | 
-| 4 0 0 | 0 6 0 | 0 0 9 | 
+| 0 0 0 | 0 7 0 | 8 0 0 | 
+| 0 0 0 | 0 0 0 | 1 0 0 | 
+| 0 2 0 | 0 3 0 | 0 0 0 | 
 +-------+-------+-------+
-| 0 1 9 | 0 0 0 | 7 4 0 | 
-| 0 0 8 | 0 0 0 | 2 0 0 | 
-| 5 0 0 | 6 0 8 | 0 0 1 | 
+| 6 0 0 | 0 0 0 | 0 7 5 | 
+| 0 0 3 | 4 0 0 | 0 0 0 | 
+| 0 0 0 | 2 0 0 | 6 0 0 | 
 +-------+-------+-------+
 
 
 Final Board: 
 
 +-------+-------+-------+
-| 2 5 3 | 8 9 4 | 1 7 6 | 
-| 1 9 6 | 2 3 7 | 5 8 4 | 
-| 8 7 4 | 1 5 6 | 9 2 3 | 
+| 3 6 9 | 8 4 1 | 7 5 2 | 
+| 2 8 1 | 7 9 5 | 4 3 6 | 
+| 5 7 4 | 3 2 6 | 9 8 1 | 
 +-------+-------+-------+
-| 3 8 1 | 9 4 2 | 6 5 7 | 
-| 9 6 7 | 3 8 5 | 4 1 2 | 
-| 4 2 5 | 7 6 1 | 8 3 9 | 
+| 1 3 6 | 5 7 4 | 8 2 9 | 
+| 7 9 5 | 6 8 2 | 1 4 3 | 
+| 4 2 8 | 1 3 9 | 5 6 7 | 
 +-------+-------+-------+
-| 6 1 9 | 5 2 3 | 7 4 8 | 
-| 7 3 8 | 4 1 9 | 2 6 5 | 
-| 5 4 2 | 6 7 8 | 3 9 1 | 
+| 6 4 2 | 9 1 8 | 3 7 5 | 
+| 9 5 3 | 4 6 7 | 2 1 8 | 
+| 8 1 7 | 2 5 3 | 6 9 4 | 
 +-------+-------+-------+
-
 ```
