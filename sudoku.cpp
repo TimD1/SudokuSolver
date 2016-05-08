@@ -1,10 +1,14 @@
-#include <iostream>		//because who doesn't use that?
-#include <string>		//for file names and usage
-#include <fstream>		//for file input/output
-#include <stack>		//to store guessed values and the corresponding arrays
-
-using namespace std;
-
+#include <iostream>
+using std::cout;
+using std::endl;
+using std::cin;
+#include <string>
+using std::string;
+#include <fstream>
+using std::ifstream;
+#include <stack>
+using std::stack;
+#include <ctime>
 
 //FORWARD FUNCTION DECLARATIONS
 bool fileExists(string file_name);
@@ -49,6 +53,7 @@ int main()
 	bool solved = false;	
 	int iteration = 1;
 	int errors = 0;
+	int guesses_made = 0;
 	bool grid_unchanging = false;
 	int quit = 0;
 	stack<string> values_stack;
@@ -61,6 +66,7 @@ int main()
 	}
 	cout << endl << endl << "Initial Board: ";
 	printGrid(grid);
+	clock_t begin = clock();
 	while(!solved)
 	{
 		//create initial grid to see if we are making progress
@@ -94,12 +100,10 @@ int main()
 		nakedPairsRow(grid, values);
 		nakedPairsCol(grid, values);
 		nakedPairsBox(grid, values);
-		
 
 		//set values which have only one possibility
 		errors += setValues(grid, values);
 		errors += checkValidity(grid);
-
 
 		//print the grid on each iteration of the loop
 		//printGrid(grid);
@@ -118,6 +122,7 @@ int main()
 		if(grid_unchanging)
 		{
 			string guess = makeGuess(values);
+			guesses_made += 1;
 			useGuess(guess, values, values_stack, guess_stack);
 			setValues(grid, values);
 			grid_unchanging = false;
@@ -126,10 +131,13 @@ int main()
 		fixWrongGuess(errors, grid, values, values_stack, guess_stack);
 		errors = 0;
 	}
+	clock_t end = clock();
 
-	//either we have solved the puzzle or can't make progress. print the results
+	//the puzzle has been solved, so print the results
 	cout << "Final Board: ";
 	printGrid(grid);
+	cout << "Execution Time: " << double(end - begin) / CLOCKS_PER_SEC << " seconds" << endl;
+	cout << "Guesses Made: " << guesses_made << endl;
 	return 0;
 }
 
